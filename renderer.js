@@ -2,10 +2,14 @@
 const notesContainer = document.getElementById('notes-container');
 const newNoteButton = document.getElementById('newNoteBtn');
 const noteTemplate = document.getElementById('note-template');
+const searchInput = document.getElementById('searchInput');
+const clearSearchButton = document.getElementById('clearSearch');
 
 // 便签数据存储
 let notes = [];
 let nextNoteId = 1;
+let filteredNotes = []; // 搜索过滤后的便签
+let currentSearchTerm = ''; // 当前搜索关键词
 
 // 从localStorage加载保存的便签内容
 window.onload = function() {
@@ -73,7 +77,13 @@ function createNewNote() {
 // 渲染所有便签
 function renderAllNotes() {
   notesContainer.innerHTML = '';
-  notes.forEach(note => renderNote(note));
+  const notesToRender = currentSearchTerm ? filteredNotes : notes;
+  notesToRender.forEach(note => renderNote(note));
+  
+  // 如果搜索后没有结果，显示提示
+  if (currentSearchTerm && filteredNotes.length === 0) {
+    showSearchEmptyState();
+  }
 }
 
 // 渲染单个便签
@@ -87,6 +97,8 @@ function renderNote(note) {
   // 设置便签标题
   const noteTitleInput = noteElement.querySelector('.note-title-input');
   noteTitleInput.value = note.title;
+  
+  // 搜索时不需要额外的视觉效果，只显示匹配的便签
   
   // 设置便签内容
   const noteContent = noteElement.querySelector('.note-content');
@@ -162,5 +174,68 @@ function deleteNote(noteId) {
   }
 }
 
-// 添加新建便签按钮事件
+// 搜索功能实现
+function performSearch(searchTerm) {
+  currentSearchTerm = searchTerm.toLowerCase().trim();
+  
+  if (currentSearchTerm === '') {
+    filteredNotes = [];
+    clearSearchButton.style.display = 'none';
+  } else {
+    // 根据标题搜索便签
+    filteredNotes = notes.filter(note => {
+      const title = note.title ? note.title.toLowerCase() : '';
+      return title.includes(currentSearchTerm);
+    });
+    clearSearchButton.style.display = 'flex';
+  }
+  
+  renderAllNotes();
+}
+
+function clearSearch() {
+  searchInput.value = '';
+  currentSearchTerm = '';
+  filteredNotes = [];
+  clearSearchButton.style.display = 'none';
+  renderAllNotes();
+}
+
+function showSearchEmptyState() {
+  const emptyState = document.createElement('div');
+  emptyState.className = 'search-empty-state';
+  emptyState.innerHTML = `
+    <div class="empty-state-content">
+      <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="m21 21-4.35-4.35"/>
+      </svg>
+      <h3>未找到匹配的便签</h3>
+      <p>尝试使用其他关键词搜索，或者<button class="link-btn" onclick="clearSearch()">清除搜索</button></p>
+    </div>
+  `;
+  notesContainer.appendChild(emptyState);
+}
+
+function highlightSearchTerm(text, searchTerm) {
+  if (!searchTerm || !text) return text;
+  
+  const regex = new RegExp(`(${searchTerm})`, 'gi');
+  return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+}
+
+// 添加事件监听器
 newNoteButton.addEventListener('click', createNewNote);
+
+// 搜索框事件监听器
+searchInput.addEventListener('input', (e) => {
+  performSearch(e.target.value);
+});
+
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    clearSearch();
+  }
+});
+
+clearSearchButton.addEventListener('click', clearSearch);
