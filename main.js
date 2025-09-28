@@ -1,14 +1,19 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 const path = require('path');
 
 // 保持对window对象的全局引用，避免JavaScript对象被垃圾回收时，窗口被自动关闭
 let mainWindow;
 
 function createWindow() {
+  // 创建图标
+  const iconPath = path.join(__dirname, 'favicon.ico');
+  const appIcon = nativeImage.createFromPath(iconPath);
+  
   // 创建浏览器窗口
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
+    icon: appIcon, // 使用nativeImage加载的图标
     autoHideMenuBar: true, // 自动隐藏菜单栏
     webPreferences: {
       nodeIntegration: true,
