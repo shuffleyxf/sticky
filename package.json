@@ -4,11 +4,23 @@
   "description": "简单的Electron示例应用",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "dist": "electron-builder --publish=never"
   },
-  "author": "",
+  "author": "shuffle",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^25.9.8"
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.example.sticky-notes",
+    "productName": "Sticky",
+    "icon": "icon-512.png",
+    "win": {
+      "target": "dir"
+    }
   }
 }
