@@ -1,3 +1,128 @@
+// 存储管理器
+class StorageManager {
+  constructor() {
+    this.isElectronAvailable = typeof window !== 'undefined' && window.electronAPI;
+    this.saveTimeout = null;
+  }
+
+  async loadData() {
+    try {
+      if (this.isElectronAvailable) {
+        console.log('使用文件存储加载数据...');
+        const data = await window.electronAPI.storage.read();
+        
+        if (data && data.notes) {
+          console.log('从文件存储加载数据成功');
+          return data;
+        } else {
+          console.log('文件存储为空，尝试从localStorage恢复...');
+          return this.loadFromLocalStorage();
+        }
+      } else {
+        console.log('Electron不可用，使用localStorage...');
+        return this.loadFromLocalStorage();
+      }
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      console.log('尝试从localStorage恢复...');
+      return this.loadFromLocalStorage();
+    }
+  }
+
+  loadFromLocalStorage() {
+    try {
+      const savedData = localStorage.getItem('stickyNotes');
+      if (savedData) {
+        console.log('从localStorage加载数据成功');
+        return JSON.parse(savedData);
+      }
+    } catch (error) {
+      console.error('从localStorage加载数据失败:', error);
+    }
+    
+    console.log('返回默认数据');
+    return {
+      notes: [],
+      nextId: 1,
+      lastModified: new Date().toISOString()
+    };
+  }
+
+  async saveData(data) {
+    try {
+      if (this.isElectronAvailable) {
+        console.log('使用文件存储保存数据...');
+        await window.electronAPI.storage.write(data);
+        console.log('文件存储保存成功');
+        
+        // 同时保存到localStorage作为备份
+        this.saveToLocalStorage(data);
+      } else {
+        console.log('Electron不可用，使用localStorage保存...');
+        this.saveToLocalStorage(data);
+      }
+    } catch (error) {
+      console.error('保存数据失败:', error);
+      console.log('尝试保存到localStorage...');
+      this.saveToLocalStorage(data);
+    }
+  }
+
+  saveToLocalStorage(data) {
+    try {
+      localStorage.setItem('stickyNotes', JSON.stringify(data));
+      console.log('localStorage保存成功');
+    } catch (error) {
+      console.error('localStorage保存失败:', error);
+    }
+  }
+
+  async createBackup() {
+    if (this.isElectronAvailable) {
+      try {
+        await window.electronAPI.storage.backup();
+        console.log('备份创建成功');
+      } catch (error) {
+        console.error('创建备份失败:', error);
+      }
+    }
+  }
+
+  async getStorageInfo() {
+    if (this.isElectronAvailable) {
+      try {
+        return await window.electronAPI.storage.getPath();
+      } catch (error) {
+        console.error('获取存储路径失败:', error);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  setupAutoBackup() {
+    if (this.isElectronAvailable) {
+      // 每5分钟自动备份一次
+      setInterval(() => {
+        this.createBackup();
+      }, 5 * 60 * 1000);
+    }
+  }
+
+  debouncedSave(data) {
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
+    }
+    
+    this.saveTimeout = setTimeout(async () => {
+      await this.saveData(data);
+    }, 500);
+  }
+}
+
+// 创建存储管理器实例
+const storageManager = new StorageManager();
+
 // 获取DOM元素
 const notesContainer = document.getElementById('notes-container');
 const newNoteButton = document.getElementById('newNoteBtn');
@@ -11,14 +136,17 @@ let nextNoteId = 1;
 let filteredNotes = []; // 搜索过滤后的便签
 let currentSearchTerm = ''; // 当前搜索关键词
 
-// 从localStorage加载保存的便签内容
-window.onload = function() {
-  loadNotes();
+// 从存储加载保存的便签内容
+window.onload = async function() {
+  await loadNotes();
   
   // 如果没有便签，创建一个新便签
   if (notes.length === 0) {
     createNewNote();
   }
+  
+  // 启动自动备份
+  storageManager.setupAutoBackup();
 };
 
 // 创建一个显示通知的函数
@@ -43,26 +171,57 @@ function showNotification(message) {
   }, 2000);
 }
 
-// 从localStorage加载便签
-function loadNotes() {
-  const savedNotes = localStorage.getItem('stickyNotes');
-  if (savedNotes) {
-    notes = JSON.parse(savedNotes);
-    // 找出最大ID值，用于新便签ID生成
-    nextNoteId = Math.max(...notes.map(note => note.id), 0) + 1;
+// 从存储加载便签
+async function loadNotes() {
+  try {
+    const data = await storageManager.loadData();
+    notes = data.notes || [];
+    nextNoteId = data.nextId || 1;
+    
+    // 如果从文件加载的数据为空，尝试从localStorage恢复
+    if (notes.length === 0) {
+      const localData = storageManager.loadFromLocalStorage();
+      if (localData && localData.notes && localData.notes.length > 0) {
+        notes = localData.notes;
+        nextNoteId = localData.nextId;
+        // 将数据同步到文件存储
+        await saveAllNotes();
+        showNotification('已从本地备份恢复数据');
+      }
+    }
     
     // 渲染所有便签
     renderAllNotes();
+    
+    // 显示存储信息（仅在开发模式下）
+    const storageInfo = await storageManager.getStorageInfo();
+    if (storageInfo) {
+      console.log('数据存储位置:', storageInfo.dataFile);
+    }
+  } catch (error) {
+    console.error('加载便签失败:', error);
+    showNotification('加载便签失败，请检查存储权限');
   }
 }
 
-// 保存所有便签到localStorage
-function saveAllNotes() {
-  localStorage.setItem('stickyNotes', JSON.stringify(notes));
+// 保存所有便签到存储
+async function saveAllNotes() {
+  try {
+    const data = {
+      notes: notes,
+      nextId: nextNoteId,
+      lastModified: new Date().toISOString()
+    };
+    
+    await storageManager.saveData(data);
+  } catch (error) {
+    console.error('保存便签失败:', error);
+    showNotification('保存失败，数据已保存到本地备份');
+  }
 }
 
 // 创建新便签
-function createNewNote() {
+async function createNewNote() {
   const newNote = {
     id: nextNoteId++,
     title: `便签 ${notes.length + 1}`,
@@ -70,7 +229,7 @@ function createNewNote() {
   };
   
   notes.push(newNote);
-  saveAllNotes();
+  await saveAllNotes();
   renderNote(newNote);
 }
 
@@ -125,7 +284,7 @@ function renderNote(note) {
   // 添加保存按钮事件
   const saveButton = noteElement.querySelector('.save-btn');
   saveButton.addEventListener('click', function() {
-    saveNote(note.id, noteContent.value);
+    saveNote(note.id);
     noteContent.focus();
   });
   
@@ -147,31 +306,45 @@ function renderNote(note) {
   notesContainer.appendChild(noteElement);
 }
 
-// 保存便签内容
-function saveNote(noteId, content) {
-  const index = notes.findIndex(note => note.id === noteId);
-  if (index !== -1) {
-    notes[index].content = content;
-    saveAllNotes();
-    showNotification('便签已保存！');
+// 保存便签
+async function saveNote(noteId) {
+  const note = notes.find(n => n.id === noteId);
+  if (!note) return;
+
+  const titleInput = document.querySelector(`[data-note-id="${noteId}"] .note-title-input`);
+  const contentTextarea = document.querySelector(`[data-note-id="${noteId}"] .note-content`);
+  
+  if (!titleInput || !contentTextarea) {
+    console.error('无法找到便签元素:', noteId);
+    return;
   }
+  
+  note.title = titleInput.value.trim() || `便签 ${noteId}`;
+  note.content = contentTextarea.value.trim();
+  
+  const data = {
+    notes: notes,
+    nextId: nextNoteId,
+    lastModified: new Date().toISOString()
+  };
+  
+  storageManager.debouncedSave(data);
+  showNotification('便签已保存！');
 }
 
 // 删除便签
-function deleteNote(noteId) {
-  const index = notes.findIndex(note => note.id === noteId);
-  if (index !== -1) {
-    notes.splice(index, 1);
-    saveAllNotes();
-    
-    // 从DOM中移除便签
-    const noteElement = document.querySelector(`.note-container[data-note-id="${noteId}"]`);
-    if (noteElement) {
-      notesContainer.removeChild(noteElement);
-    }
-    
-    showNotification('便签已删除！');
+async function deleteNote(noteId) {
+  const noteIndex = notes.findIndex(n => n.id === noteId);
+  if (noteIndex === -1) return;
+
+  const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
+  if (noteElement) {
+    noteElement.remove();
   }
+
+  notes.splice(noteIndex, 1);
+  await saveAllNotes();
+  showNotification('便签已删除！');
 }
 
 // 搜索功能实现
