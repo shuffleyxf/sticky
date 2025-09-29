@@ -136,6 +136,9 @@ let nextNoteId = 1;
 let filteredNotes = []; // 搜索过滤后的便签
 let currentSearchTerm = ''; // 当前搜索关键词
 
+// 自动更新定时器
+let timeUpdateInterval = null;
+
 // 从存储加载保存的便签内容
 window.onload = async function() {
   await loadNotes();
@@ -147,6 +150,9 @@ window.onload = async function() {
   
   // 启动自动备份
   storageManager.setupAutoBackup();
+  
+  // 启动时间自动更新定时器
+  startTimeUpdateTimer();
 };
 
 // 创建一个显示通知的函数
@@ -171,6 +177,49 @@ function showNotification(message) {
   }, 2000);
 }
 
+// 时间格式化函数
+function formatTime(timestamp) {
+  if (!timestamp) return '刚刚创建';
+  
+  const now = new Date();
+  const time = new Date(timestamp);
+  
+  // 检查时间对象是否有效
+  if (isNaN(time.getTime())) {
+    console.error('无效的时间戳:', timestamp);
+    return '时间错误';
+  }
+  
+  const diffMs = now.getTime() - time.getTime();
+  
+  // 如果时间差为负数或者非常小，说明是刚创建的
+  if (diffMs < 0 || diffMs < 1000) {
+    return '刚刚';
+  }
+  
+  // 计算时间差
+  const seconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (seconds < 60) {
+    return '刚刚';
+  } else if (minutes < 60) {
+    return `${minutes}分钟前`;
+  } else if (hours < 24) {
+    return `${hours}小时前`;
+  } else if (days < 7) {
+    return `${days}天前`;
+  } else {
+    // 超过一周显示具体日期
+    return time.toLocaleDateString('zh-CN', {
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+}
+
 // 从存储加载便签
 async function loadNotes() {
   try {
@@ -178,12 +227,34 @@ async function loadNotes() {
     notes = data.notes || [];
     nextNoteId = data.nextId || 1;
     
+    // 为旧便签添加时间字段兼容性
+    const now = new Date().toISOString();
+    notes.forEach(note => {
+      if (!note.createdAt) {
+        note.createdAt = now;
+      }
+      if (!note.updatedAt) {
+        note.updatedAt = note.createdAt;
+      }
+    });
+    
     // 如果从文件加载的数据为空，尝试从localStorage恢复
     if (notes.length === 0) {
       const localData = storageManager.loadFromLocalStorage();
       if (localData && localData.notes && localData.notes.length > 0) {
         notes = localData.notes;
         nextNoteId = localData.nextId;
+        
+        // 为恢复的便签也添加时间字段
+        notes.forEach(note => {
+          if (!note.createdAt) {
+            note.createdAt = now;
+          }
+          if (!note.updatedAt) {
+            note.updatedAt = note.createdAt;
+          }
+        });
+        
         // 将数据同步到文件存储
         await saveAllNotes();
         showNotification('已从本地备份恢复数据');
@@ -222,10 +293,13 @@ async function saveAllNotes() {
 
 // 创建新便签
 async function createNewNote() {
+  const now = new Date().toISOString();
   const newNote = {
     id: nextNoteId++,
     title: `便签 ${notes.length + 1}`,
-    content: ''
+    content: '',
+    createdAt: now,
+    updatedAt: now
   };
   
   notes.push(newNote);
@@ -262,6 +336,14 @@ function renderNote(note) {
   // 设置便签内容
   const noteContent = noteElement.querySelector('.note-content');
   noteContent.value = note.content;
+  
+  // 设置时间显示
+  const noteDateElement = noteElement.querySelector('.note-date');
+  if (noteDateElement) {
+    // 优先显示修改时间，如果没有则显示创建时间
+    const displayTime = note.updatedAt || note.createdAt;
+    noteDateElement.textContent = formatTime(displayTime);
+  }
   
   // 添加标题变化事件
   noteTitleInput.addEventListener('input', function() {
@@ -321,6 +403,16 @@ async function saveNote(noteId) {
   
   note.title = titleInput.value.trim() || `便签 ${noteId}`;
   note.content = contentTextarea.value.trim();
+  note.updatedAt = new Date().toISOString();
+  
+  // 更新时间显示
+  const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
+  if (noteElement) {
+    const dateElement = noteElement.querySelector('.note-date');
+    if (dateElement) {
+      dateElement.textContent = formatTime(note.updatedAt);
+    }
+  }
   
   const data = {
     notes: notes,
@@ -397,6 +489,44 @@ function highlightSearchTerm(text, searchTerm) {
   return text.replace(regex, '<mark class="search-highlight">$1</mark>');
 }
 
+// 更新所有便签的时间显示
+function updateAllNoteTimes() {
+  const noteElements = document.querySelectorAll('.note-container');
+  
+  noteElements.forEach(noteElement => {
+    const noteId = parseInt(noteElement.dataset.noteId);
+    const note = notes.find(n => n.id === noteId);
+    
+    if (note) {
+      const dateElement = noteElement.querySelector('.note-date');
+      if (dateElement) {
+        // 优先显示修改时间，如果没有则显示创建时间
+        const displayTime = note.updatedAt || note.createdAt;
+        dateElement.textContent = formatTime(displayTime);
+      }
+    }
+  });
+}
+
+// 启动自动更新定时器
+function startTimeUpdateTimer() {
+  // 清除现有定时器（如果有的话）
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+  }
+  
+  // 每分钟（60000毫秒）更新一次时间显示
+  timeUpdateInterval = setInterval(updateAllNoteTimes, 60000);
+}
+
+// 停止自动更新定时器
+function stopTimeUpdateTimer() {
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+    timeUpdateInterval = null;
+  }
+}
+
 // 添加事件监听器
 newNoteButton.addEventListener('click', createNewNote);
 
@@ -412,3 +542,49 @@ searchInput.addEventListener('keydown', (e) => {
 });
 
 clearSearchButton.addEventListener('click', clearSearch);
+
+// 测试函数 - 创建不同时间的便签用于测试
+window.createTestNotes = function() {
+  const now = new Date();
+  
+  // 创建5分钟前的便签
+  const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+  const testNote1 = {
+    id: nextNoteId++,
+    title: '5分钟前的便签',
+    content: '这是5分钟前创建的便签',
+    createdAt: fiveMinutesAgo,
+    updatedAt: fiveMinutesAgo
+  };
+  
+  // 创建2小时前的便签
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+  const testNote2 = {
+    id: nextNoteId++,
+    title: '2小时前的便签',
+    content: '这是2小时前创建的便签',
+    createdAt: twoHoursAgo,
+    updatedAt: twoHoursAgo
+  };
+  
+  // 创建3天前的便签
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const testNote3 = {
+    id: nextNoteId++,
+    title: '3天前的便签',
+    content: '这是3天前创建的便签',
+    createdAt: threeDaysAgo,
+    updatedAt: threeDaysAgo
+  };
+  
+  notes.push(testNote1, testNote2, testNote3);
+  renderAllNotes();
+  saveAllNotes();
+  
+  console.log('测试便签已创建');
+};
+
+// 页面卸载时清理定时器
+window.addEventListener('beforeunload', () => {
+  stopTimeUpdateTimer();
+});
