@@ -8,7 +8,7 @@ let mainWindow;
 
 function createWindow() {
   // 创建图标
-  const iconPath = path.join(__dirname, 'favicon.ico');
+  const iconPath = path.join(__dirname, 'assets', 'icons', 'favicon.ico');
   const appIcon = nativeImage.createFromPath(iconPath);
   
   // 创建浏览器窗口
@@ -30,7 +30,7 @@ function createWindow() {
   // 加载应用的index.html
   mainWindow.loadFile('index.html');
 
-  // 打开开发者工具
+  // 打开开发者工具 (已禁用)
   // mainWindow.webContents.openDevTools();
 
   // 当window被关闭时，触发下面的事件
