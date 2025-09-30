@@ -2,7 +2,7 @@
   "name": "sticky",
   "version": "0.1.0",
   "description": "简约的便签应用",
-  "main": "main.js",
+  "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",

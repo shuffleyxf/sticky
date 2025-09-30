@@ -19,8 +19,8 @@ const server = http.createServer((req, res) => {
     return;
   }
   
-  // 构建完整的文件路径
-  const fullPath = path.join(__dirname, filePath);
+  // 构建完整的文件路径 - 修改为指向项目根目录
+  const fullPath = path.join(__dirname, '..', '..', filePath);
   
   const extname = String(path.extname(filePath)).toLowerCase();
   const mimeTypes = {

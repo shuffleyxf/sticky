@@ -1,67 +1,6 @@
-const { app, BrowserWindow, nativeImage, ipcMain } = require('electron');
-const path = require('path');
 const fs = require('fs').promises;
-const os = require('os');
-
-// 保持对window对象的全局引用，避免JavaScript对象被垃圾回收时，窗口被自动关闭
-let mainWindow;
-
-function createWindow() {
-  // 创建图标
-  const iconPath = path.join(__dirname, 'assets', 'icons', 'favicon.ico');
-  const appIcon = nativeImage.createFromPath(iconPath);
-  
-  // 创建浏览器窗口
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    icon: appIcon, // 使用nativeImage加载的图标
-    autoHideMenuBar: true, // 自动隐藏菜单栏
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    }
-  });
-  
-  // 隐藏菜单栏
-  mainWindow.setMenuBarVisibility(false);
-
-  // 加载应用的index.html
-  mainWindow.loadFile('index.html');
-
-  // 打开开发者工具 (已禁用)
-  // mainWindow.webContents.openDevTools();
-
-  // 当window被关闭时，触发下面的事件
-  mainWindow.on('closed', function () {
-    mainWindow = null;
-  });
-}
-
-// 当Electron完成初始化并准备创建浏览器窗口时调用此方法
-app.whenReady().then(createWindow);
-
-// 所有窗口关闭时退出应用
-app.on('window-all-closed', function () {
-  // 在macOS上，除非用户使用Cmd + Q确定地退出
-  // 否则绝大部分应用会保持活动状态
-  if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('activate', function () {
-  // 在macOS上，当点击dock图标并且没有其他窗口打开时，
-  // 通常会在应用程序中重新创建一个窗口
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
-});
-
-// 存储相关的配置和函数
-const STORAGE_CONFIG = {
-  dataDir: path.join(os.homedir(), '.sticky-notes'),
-  dataFile: 'notes.json',
-  backupFile: 'notes.backup.json',
-  maxBackups: 5
-};
+const path = require('path');
+const { STORAGE_CONFIG, getDataPath } = require('./config');
 
 // 确保数据目录存在
 async function ensureDataDir() {
@@ -70,12 +9,6 @@ async function ensureDataDir() {
   } catch (error) {
     await fs.mkdir(STORAGE_CONFIG.dataDir, { recursive: true });
   }
-}
-
-// 获取数据文件路径
-function getDataPath(isBackup = false) {
-  const fileName = isBackup ? STORAGE_CONFIG.backupFile : STORAGE_CONFIG.dataFile;
-  return path.join(STORAGE_CONFIG.dataDir, fileName);
 }
 
 // 读取便签数据
@@ -176,23 +109,18 @@ async function cleanupOldBackups() {
   }
 }
 
-// IPC 处理程序
-ipcMain.handle('storage:read', async () => {
-  return await readNotesData();
-});
-
-ipcMain.handle('storage:write', async (event, data) => {
-  return await writeNotesData(data);
-});
-
-ipcMain.handle('storage:backup', async () => {
-  return await createBackup();
-});
-
-ipcMain.handle('storage:getPath', () => {
+// 获取存储路径信息
+function getStoragePaths() {
   return {
     dataDir: STORAGE_CONFIG.dataDir,
     dataFile: getDataPath(),
     backupFile: getDataPath(true)
   };
-});
+}
+
+module.exports = {
+  readNotesData,
+  writeNotesData,
+  createBackup,
+  getStoragePaths
+};

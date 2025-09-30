@@ -4,6 +4,47 @@
   box-sizing: border-box;
 }
 
+/* 通知容器样式 */
+#notification-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  max-width: 300px;
+}
+
+/* 通知样式 */
+.notification {
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-bottom: 10px;
+  padding: 12px 16px;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+  font-size: 14px;
+  color: white;
+  cursor: pointer;
+}
+
+/* 通知类型样式 */
+.notification-success {
+  background: #4CAF50;
+}
+
+.notification-error {
+  background: #F44336;
+}
+
+.notification-warning {
+  background: #FF9800;
+}
+
+.notification-info {
+  background: #2196F3;
+}
+
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #F1F8E9 0%, #DCEDC8 100%);
@@ -471,5 +512,3 @@ button {
 .link-btn:hover {
   color: #45A049;
 }
-
-/* 搜索功能保持简洁，不需要额外的视觉高亮效果 */
