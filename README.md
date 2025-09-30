@@ -1,7 +1,7 @@
 # Sticky Notes - 简约便签应用
 
 <div align="center">
-  <img src="icon-512.png" alt="Sticky Notes Logo" width="128" height="128">
+  <img src="assets/icons/icon-512.png" alt="Sticky Notes Logo" width="128" height="128">
   
   <p>一个简洁、高效的桌面便签应用，基于 Electron 构建</p>
   
@@ -19,7 +19,7 @@
 
 ## 📸 预览
 
-![应用截图](./preview.png)
+![应用截图](./assets/images/preview.png)
 
 ## 🚀 快速开始
 
@@ -28,20 +28,14 @@
 - [Node.js](https://nodejs.org/) (推荐 v16 或更高版本)
 - npm 或 yarn
 
-### 安装步骤
+### 本地运行
 
-1. **克隆仓库**
-   ```bash
-   git clone https://github.com/your-username/sticky.git
-   cd sticky
-   ```
-
-2. **安装依赖**
+1. **安装依赖**
    ```bash
    npm install
    ```
 
-3. **启动应用**
+2. **启动应用**
    ```bash
    npm start
    ```
@@ -58,30 +52,6 @@ npm run build:win
 # 生成分发包
 npm run dist
 ```
-
-## 📁 项目结构
-
-```
-sticky/
-├── main.js          # Electron 主进程
-├── renderer.js      # 渲染进程逻辑
-├── preload.js       # 预加载脚本
-├── index.html       # 主界面
-├── styles.css       # 样式文件
-├── server.js        # 开发服务器
-├── icon-512.png     # 应用图标
-├── favicon.ico      # 网站图标
-├── package.json     # 项目配置
-├── progress.md      # 开发进度
-└── README.md        # 项目说明
-```
-
-## 🛠️ 技术栈
-
-- **框架**: [Electron](https://electronjs.org/) - 跨平台桌面应用开发
-- **前端**: HTML5 + CSS3 + JavaScript (ES6+)
-- **构建工具**: [electron-builder](https://www.electron.build/) - 应用打包
-- **存储**: LocalStorage + 文件系统双重备份
 
 ## 📋 使用说明
 
