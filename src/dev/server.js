@@ -20,7 +20,17 @@ const server = http.createServer((req, res) => {
   }
   
   // 构建完整的文件路径 - 修改为指向项目根目录
-  const fullPath = path.join(__dirname, '..', '..', filePath);
+  let fullPath = path.join(__dirname, '..', '..', filePath);
+  
+  // 检查文件是否存在，如果不存在，尝试从其他可能的路径加载
+  if (!fs.existsSync(fullPath)) {
+    // 尝试从renderer目录加载
+    const rendererPath = path.join(__dirname, '..', 'renderer', filePath.replace(/^\//, ''));
+    if (fs.existsSync(rendererPath)) {
+      fullPath = rendererPath;
+      console.log(`文件重定向: ${filePath} -> ${rendererPath}`);
+    }
+  }
   
   const extname = String(path.extname(filePath)).toLowerCase();
   const mimeTypes = {
