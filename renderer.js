@@ -442,17 +442,28 @@ async function deleteNote(noteId) {
 // 搜索功能实现
 function performSearch(searchTerm) {
   currentSearchTerm = searchTerm.toLowerCase().trim();
+  const searchBox = document.querySelector('.search-box');
   
   if (currentSearchTerm === '') {
     filteredNotes = [];
-    clearSearchButton.style.display = 'none';
+    if (clearSearchButton) {
+      clearSearchButton.classList.remove('show');
+    }
+    if (searchBox) {
+      searchBox.classList.remove('has-content');
+    }
   } else {
     // 根据标题搜索便签
     filteredNotes = notes.filter(note => {
       const title = note.title ? note.title.toLowerCase() : '';
       return title.includes(currentSearchTerm);
     });
-    clearSearchButton.style.display = 'flex';
+    if (clearSearchButton) {
+      clearSearchButton.classList.add('show');
+    }
+    if (searchBox) {
+      searchBox.classList.add('has-content');
+    }
   }
   
   renderAllNotes();
@@ -462,7 +473,14 @@ function clearSearch() {
   searchInput.value = '';
   currentSearchTerm = '';
   filteredNotes = [];
-  clearSearchButton.style.display = 'none';
+  const searchBox = document.querySelector('.search-box');
+  
+  if (clearSearchButton) {
+    clearSearchButton.classList.remove('show');
+  }
+  if (searchBox) {
+    searchBox.classList.remove('has-content');
+  }
   renderAllNotes();
 }
 
