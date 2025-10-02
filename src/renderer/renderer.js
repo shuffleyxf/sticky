@@ -8,6 +8,7 @@ import StorageService from './services/storage.js';
 import NotesService from './services/notes.js';
 import SearchService from './services/search.js';
 import NotificationService from './services/notification.js';
+import ToolsService from './services/tools.js';
 
 // 导入工具模块
 import { formatTime } from './utils/time.js';
@@ -24,6 +25,7 @@ class StickyNotesApp {
     this.notificationService = new NotificationService();
     this.notesService = new NotesService(this.storageService, this.notificationService);
     this.searchService = new SearchService();
+    this.toolsService = new ToolsService(this.notificationService);
     
     // DOM元素
     this.notesContainer = null;
@@ -75,6 +77,95 @@ class StickyNotesApp {
       console.error('应用初始化失败:', error);
       this.notificationService.error('应用初始化失败，请刷新页面重试');
     }
+  }
+  
+  /**
+   * 创建工具栏按钮
+   * @param {string} id - 按钮ID
+   * @param {string} title - 按钮提示文本
+   * @param {string} iconId - SVG图标模板ID
+   * @param {Function} clickHandler - 点击事件处理函数
+   * @returns {HTMLElement} - 按钮元素
+   */
+  createToolButton(id, title, iconId, clickHandler) {
+    const button = document.createElement('button');
+    button.className = `tool-btn ${id}-btn`;
+    button.title = title;
+    
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'tool-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    
+    // 从模板中获取SVG内容
+    const iconTemplate = document.getElementById(iconId);
+    if (iconTemplate) {
+      svg.innerHTML = iconTemplate.innerHTML;
+    }
+    
+    button.appendChild(svg);
+    
+    // 添加点击事件
+    if (clickHandler) {
+      button.addEventListener('click', clickHandler);
+    }
+    
+    return button;
+  }
+
+  /**
+   * 绑定工具栏事件
+   * @param {HTMLElement} noteElement - 便签元素
+   * @param {Object} note - 便签数据
+   */
+  bindToolbarEvents(noteElement, note) {
+    const toolbar = noteElement.querySelector('.header-toolbar');
+    
+    if (!toolbar) return;
+    
+    // 清空工具栏
+    toolbar.innerHTML = '';
+    
+    // 获取可用工具
+    const tools = this.toolsService.getAvailableTools(noteElement);
+    
+    // 动态创建工具按钮
+    tools.forEach(tool => {
+      const button = this.createToolButton(tool.id, tool.title, tool.iconId, tool.handler);
+      toolbar.appendChild(button);
+    });
+  }
+
+  /**
+   * 渲染单个便签
+   * @param {Object} note - 便签数据
+   */
+  renderNote(note) {
+    // 获取便签模板
+    const template = document.getElementById('note-template');
+    const noteElement = document.importNode(template.content, true).querySelector('.note-container');
+    
+    // 设置便签ID
+    noteElement.dataset.noteId = note.id;
+    
+    // 设置便签内容
+    const titleInput = noteElement.querySelector('.note-title-input');
+    const contentTextarea = noteElement.querySelector('.note-content');
+    const dateElement = noteElement.querySelector('.note-date');
+    
+    titleInput.value = note.title || '';
+    contentTextarea.value = note.content || '';
+    dateElement.textContent = formatTime(note.updatedAt);
+    
+    // 绑定事件
+    this.bindNoteEvents(noteElement, note);
+    
+    // 绑定工具栏事件
+    this.bindToolbarEvents(noteElement, note);
+    
+    return noteElement;
   }
 
   /**
@@ -343,3 +434,74 @@ window.addEventListener('DOMContentLoaded', async () => {
 // 导出到全局作用域供开发使用
 window.stickyNotesApp = app;
 window.createTestNotes = () => app.createTestNotes();
+
+/**
+ * 绑定便签事件
+ * @param {Element} noteElement - 便签DOM元素
+ * @param {Object} note - 便签数据
+ */
+StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
+  const titleInput = noteElement.querySelector('.note-title-input');
+  const contentTextarea = noteElement.querySelector('.note-content');
+  const saveButton = noteElement.querySelector('.save-btn');
+  const deleteButton = noteElement.querySelector('.delete-btn');
+  const toolsToggleBtn = noteElement.querySelector('.tools-toggle-btn');
+  const toolbarWrapper = noteElement.querySelector('.toolbar-wrapper');
+  
+  // 标题输入事件
+  if (titleInput) {
+    titleInput.addEventListener('input', () => {
+      this.handleSaveNote(note.id, {
+        title: titleInput.value.trim() || `便签 ${note.id}`
+      });
+    });
+  }
+  
+  // 内容输入事件
+  if (contentTextarea) {
+    contentTextarea.addEventListener('input', () => {
+      this.handleSaveNote(note.id, {
+        content: contentTextarea.value
+      });
+    });
+  }
+  
+  // 保存按钮点击事件
+  if (saveButton) {
+    saveButton.addEventListener('click', () => {
+      this.handleManualSaveNote(note.id, {
+        title: titleInput ? titleInput.value.trim() || `便签 ${note.id}` : note.title,
+        content: contentTextarea ? contentTextarea.value : note.content
+      });
+    });
+  }
+  
+  // 删除按钮点击事件
+  if (deleteButton) {
+    deleteButton.addEventListener('click', () => {
+      if (confirm('确定要删除这个便签吗？')) {
+        this.handleDeleteNote(note.id);
+      }
+    });
+  }
+  
+  // 工具栏切换按钮点击事件
+  if (toolsToggleBtn && toolbarWrapper) {
+    toolsToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // 阻止事件冒泡
+      toolbarWrapper.classList.toggle('active');
+    });
+  }
+  
+  // 点击文档其他区域关闭工具栏
+  document.addEventListener('click', (e) => {
+    const allToolbarWrappers = document.querySelectorAll('.toolbar-wrapper');
+    allToolbarWrappers.forEach(wrapper => {
+      if (!wrapper.contains(e.target) && 
+          !e.target.closest('.tools-toggle-btn') &&
+          wrapper.classList.contains('active')) {
+        wrapper.classList.remove('active');
+      }
+    });
+  });
+}

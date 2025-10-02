@@ -6,8 +6,8 @@ import { formatTime } from './time.js';
 import { createElement, getElement } from './dom.js';
 
 /**
- * 渲染单个便签
- * @param {Object} note 便签对象
+ * 渲染便签
+ * @param {Object} note 便签数据
  * @param {Object} searchService 搜索服务实例
  * @param {Function} onAutoSave 自动保存回调函数
  * @param {Function} onManualSave 手动保存回调函数
@@ -15,24 +15,32 @@ import { createElement, getElement } from './dom.js';
  * @returns {Element} 便签DOM元素
  */
 export function renderNote(note, searchService, onAutoSave, onManualSave, onDelete) {
-  const noteTemplate = getElement('#note-template');
-  if (!noteTemplate) {
+  // 获取便签模板
+  const template = document.getElementById('note-template');
+  if (!template) {
     console.error('找不到便签模板');
     return null;
   }
   
-  const noteClone = noteTemplate.content.cloneNode(true);
+  // 克隆模板
+  const noteClone = template.content.cloneNode(true);
   const noteContainer = noteClone.querySelector('.note-container');
   
   // 设置便签ID
   noteContainer.dataset.noteId = note.id;
   
   // 获取各个元素
-  const titleInput = noteClone.querySelector('.note-title-input');
-  const contentTextarea = noteClone.querySelector('.note-content');
-  const dateElement = noteClone.querySelector('.note-date');
-  const saveButton = noteClone.querySelector('.save-btn');
-  const deleteButton = noteClone.querySelector('.delete-btn');
+  const titleInput = noteContainer.querySelector('.note-title-input');
+  const contentTextarea = noteContainer.querySelector('.note-content');
+  const dateElement = noteContainer.querySelector('.note-date');
+  const saveButton = noteContainer.querySelector('.save-btn');
+  const deleteButton = noteContainer.querySelector('.delete-btn');
+  
+  // 获取工具栏按钮
+  const formatJsonBtn = noteContainer.querySelector('.format-json-btn');
+  const clearBtn = noteContainer.querySelector('.clear-btn');
+  const copyBtn = noteContainer.querySelector('.copy-btn');
+  const formatTextBtn = noteContainer.querySelector('.format-text-btn');
   
   // 设置内容
   if (titleInput) {
@@ -98,6 +106,83 @@ export function renderNote(note, searchService, onAutoSave, onManualSave, onDele
     });
   }
   
+  // 文本格式化按钮点击事件
+  if (formatTextBtn) {
+    formatTextBtn.addEventListener('click', () => {
+      const content = contentTextarea.value;
+      if (content) {
+        // 简单的文本格式化：去除多余空行，规范缩进
+        const formattedText = content
+          .split('\n')
+          .filter(line => line.trim() !== '') // 移除空行
+          .join('\n');
+        
+        contentTextarea.value = formattedText;
+        onAutoSave(note.id, {
+          content: formattedText
+        });
+        
+        // 显示成功通知
+        const event = new CustomEvent('notification', {
+          detail: { message: '文本格式化成功', type: 'success' }
+        });
+        document.dispatchEvent(event);
+      }
+    });
+  }
+  
+  // 添加工具栏按钮事件
+  if (formatJsonBtn) {
+    formatJsonBtn.addEventListener('click', () => {
+      try {
+        const content = contentTextarea.value.trim();
+        if (content) {
+          const jsonObj = JSON.parse(content);
+          contentTextarea.value = JSON.stringify(jsonObj, null, 2);
+          onAutoSave(note.id, {
+            content: contentTextarea.value
+          });
+          // 显示成功通知
+          const event = new CustomEvent('notification', {
+            detail: { message: 'JSON格式化成功', type: 'success' }
+          });
+          document.dispatchEvent(event);
+        }
+      } catch (error) {
+        // 显示错误通知
+        const event = new CustomEvent('notification', {
+          detail: { message: '无效的JSON格式', type: 'error' }
+        });
+        document.dispatchEvent(event);
+      }
+    });
+  }
+  
+  // 清空内容按钮点击事件
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      if (confirm('确定要清空便签内容吗？')) {
+        contentTextarea.value = '';
+        onAutoSave(note.id, {
+          content: ''
+        });
+      }
+    });
+  }
+  
+  // 复制内容按钮点击事件
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      contentTextarea.select();
+      document.execCommand('copy');
+      // 显示信息通知
+      const event = new CustomEvent('notification', {
+        detail: { message: '内容已复制到剪贴板', type: 'info' }
+      });
+      document.dispatchEvent(event);
+    });
+  }
+  
   return noteContainer;
 }
 
@@ -142,7 +227,41 @@ export function renderAllNotes(notes, container, searchService, onAutoSave, onMa
   notesToRender.forEach(note => {
     const noteElement = renderNote(note, searchService, onAutoSave, onManualSave, onDelete);
     if (noteElement) {
+      // 确保工具栏显示
+      const toolbar = noteElement.querySelector('.note-toolbar');
+      if (toolbar) {
+        toolbar.style.display = 'flex';
+      }
       container.appendChild(noteElement);
+      
+      // 重要：确保工具栏功能正常初始化
+      if (window.stickyNotesApp) {
+        window.stickyNotesApp.bindToolbarEvents(noteElement, note);
+      }
+      
+      // 绑定工具栏切换按钮事件
+      const toolsToggleBtn = noteElement.querySelector('.tools-toggle-btn');
+      const toolbarWrapper = noteElement.querySelector('.toolbar-wrapper');
+      
+      if (toolsToggleBtn && toolbarWrapper) {
+        // 点击切换按钮时显示/隐藏工具栏
+        toolsToggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toolbarWrapper.classList.toggle('active');
+        });
+        
+        // 点击工具栏内部时阻止事件冒泡，防止关闭
+        toolbarWrapper.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+        
+        // 点击便签其他区域时关闭工具栏
+        noteElement.addEventListener('click', () => {
+          if (toolbarWrapper.classList.contains('active')) {
+            toolbarWrapper.classList.remove('active');
+          }
+        });
+      }
     }
   });
 }
@@ -267,11 +386,20 @@ export function scrollToNote(noteId) {
 
 /**
  * 获取便签元素的输入框
- * @param {number} noteId 便签ID
+ * @param {number|Element} noteId 便签ID或便签元素
  * @returns {Object} 包含titleInput和contentTextarea的对象
  */
 export function getNoteInputs(noteId) {
-  const noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
+  let noteElement;
+  
+  if (typeof noteId === 'object') {
+    // 如果传入的是DOM元素
+    noteElement = noteId;
+  } else {
+    // 如果传入的是ID
+    noteElement = document.querySelector(`[data-note-id="${noteId}"]`);
+  }
+  
   if (!noteElement) {
     return null;
   }
