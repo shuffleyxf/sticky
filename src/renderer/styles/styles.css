@@ -262,6 +262,91 @@ body {
   position: relative;
 }
 
+.note-container.maximized {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden !important;
+  background-color: var(--bg-color);
+  transition: all 0.3s ease;
+  transform: none !important;
+}
+
+/* 禁用最大化状态下的所有特效 */
+.note-container.maximized:hover,
+.note-container.maximized:focus,
+.note-container.maximized:focus-within {
+  transform: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+/* 最大化状态下的内容区域样式 */
+.note-container.maximized .note-content {
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 20px;
+  height: calc(100vh - 120px);
+  overflow: auto;
+}
+
+/* 自定义滚动条样式 */
+.note-container.maximized .note-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.note-container.maximized .note-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.note-container.maximized .note-content::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+/* 隐藏沉浸式模式下的滚动条 */
+body.has-maximized-note {
+  overflow: hidden !important;
+}
+
+/* 基本布局设置 */
+html, body {
+  height: 100%;
+  width: 100%;
+}
+
+/* 仅在沉浸式模式下隐藏滚动条 */
+body.has-maximized-note ::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* 确保最大化容器不显示滚动条 */
+.note-container.maximized {
+  overflow: hidden !important;
+}
+
+/* 最大化状态下的标题样式 */
+.note-container.maximized .note-title-input {
+  font-size: 24px;
+  padding: 15px 20px;
+}
+
+/* 最大化状态下的工具栏样式 */
+.note-container.maximized .toolbar-wrapper {
+  padding: 10px 20px;
+}
+
 .note-container:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);

@@ -312,6 +312,42 @@ class StickyNotesApp {
       // 注意：通知已在NotesService.saveNoteManually中处理，这里不再显示错误通知
     }
   }
+  
+  /**
+   * 切换便签最大化状态
+   * @param {string} noteId - 便签ID
+   */
+  toggleMaximizeNote(noteId) {
+    console.log('执行toggleMaximizeNote方法', noteId);
+    const noteElement = document.querySelector(`.note-container[data-note-id="${noteId}"]`);
+    console.log('找到便签元素:', noteElement);
+    
+    if (noteElement) {
+      if (noteElement.classList.contains('maximized')) {
+        // 还原便签
+        console.log('还原便签');
+        noteElement.classList.remove('maximized');
+        document.body.classList.remove('has-maximized-note'); // 移除body类名
+        noteElement.querySelector('.maximize-btn').title = '最大化编辑';
+        noteElement.querySelector('.maximize-btn svg path').setAttribute('d', 'M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3');
+      } else {
+        // 最大化便签
+        console.log('最大化便签');
+        noteElement.classList.add('maximized');
+        document.body.classList.add('has-maximized-note'); // 添加body类名
+        noteElement.querySelector('.maximize-btn').title = '还原便签';
+        noteElement.querySelector('.maximize-btn svg path').setAttribute('d', 'M4 14h6m0 0v6m0-6l-7 7m11-3h6m0 0v-6m0 6l-7-7');
+        
+        // 聚焦到内容编辑区
+        setTimeout(() => {
+          const contentEditor = noteElement.querySelector('.note-content');
+          if (contentEditor) {
+            contentEditor.focus();
+          }
+        }, 100);
+      }
+    }
+  }
 
   /**
    * 处理删除便签
@@ -417,6 +453,17 @@ class StickyNotesApp {
         else if (e.key === 'e' || e.key === 'E') {
           e.preventDefault();
           this.focusNoteContent();
+        }
+        // Ctrl+M快捷键已移除，仅使用F11作为全屏快捷键
+      }
+      
+      // F11 - 切换当前便签的最大化状态
+      if (e.key === 'F11') {
+        e.preventDefault();
+        const activeElement = document.activeElement;
+        const noteContainer = activeElement ? activeElement.closest('.note-container') : null;
+        if (noteContainer) {
+          this.toggleMaximizeNote(noteContainer.dataset.noteId);
         }
       }
     });
@@ -557,6 +604,34 @@ window.addEventListener('DOMContentLoaded', async () => {
 window.stickyNotesApp = app;
 window.createTestNotes = () => app.createTestNotes();
 
+// 全局最大化切换函数
+window.toggleMaximize = function(button) {
+  const noteContainer = button.closest('.note-container');
+  if (!noteContainer) return;
+  
+  console.log('切换最大化状态', noteContainer.dataset.noteId);
+  
+  if (noteContainer.classList.contains('maximized')) {
+    // 还原便签
+    noteContainer.classList.remove('maximized');
+    button.title = '最大化编辑';
+    button.querySelector('svg path').setAttribute('d', 'M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3');
+  } else {
+    // 最大化便签
+    noteContainer.classList.add('maximized');
+    button.title = '还原便签';
+    button.querySelector('svg path').setAttribute('d', 'M4 14h6m0 0v6m0-6l-7 7m11-3h6m0 0v-6m0 6l-7-7');
+    
+    // 聚焦到内容编辑区
+    setTimeout(() => {
+      const contentEditor = noteContainer.querySelector('.note-content');
+      if (contentEditor) {
+        contentEditor.focus();
+      }
+    }, 100);
+  }
+};
+
 /**
  * 绑定便签事件
  * @param {Element} noteElement - 便签DOM元素
@@ -569,6 +644,17 @@ StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
   const deleteButton = noteElement.querySelector('.delete-btn');
   const toolsToggleBtn = noteElement.querySelector('.tools-toggle-btn');
   const toolbarWrapper = noteElement.querySelector('.toolbar-wrapper');
+  const maximizeButton = noteElement.querySelector('.maximize-btn');
+  
+  // 最大化按钮点击事件
+  if (maximizeButton) {
+    console.log('绑定最大化按钮事件', note.id);
+    const self = this; // 保存this引用
+    maximizeButton.addEventListener('click', function() {
+      console.log('最大化按钮被点击', note.id);
+      self.toggleMaximizeNote(note.id);
+    });
+  }
   
   // 标题输入事件
   if (titleInput) {
@@ -604,6 +690,13 @@ StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
       if (confirm('确定要删除这个便签吗？')) {
         this.handleDeleteNote(note.id);
       }
+    });
+  }
+  
+  // 最大化按钮点击事件
+  if (maximizeButton) {
+    maximizeButton.addEventListener('click', () => {
+      this.toggleMaximizeNote(note.id);
     });
   }
   
