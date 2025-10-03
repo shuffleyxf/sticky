@@ -398,6 +398,110 @@ class StickyNotesApp {
         }
       });
     }
+    
+    // 添加便签间导航快捷键
+    document.addEventListener('keydown', (e) => {
+      // 只有按下Ctrl键时才处理
+      if (e.ctrlKey) {
+        // 上方向键 - 导航到上一个便签
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          this.navigateNotes('prev');
+        }
+        // 下方向键 - 导航到下一个便签
+        else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          this.navigateNotes('next');
+        }
+        // Ctrl+E - 将焦点移动到便签内容编辑区
+        else if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault();
+          this.focusNoteContent();
+        }
+      }
+    });
+  }
+  
+  /**
+   * 便签间导航
+   * @param {string} direction - 导航方向 ('prev' 或 'next')
+   */
+  navigateNotes(direction) {
+    // 获取所有便签元素
+    const noteElements = document.querySelectorAll('.note-container');
+    if (noteElements.length <= 1) return; // 只有一个或没有便签时不需要导航
+    
+    // 找到当前活动的便签
+    let activeNoteIndex = -1;
+    const activeElement = document.activeElement;
+    
+    // 检查当前焦点是否在某个便签内
+    for (let i = 0; i < noteElements.length; i++) {
+      if (noteElements[i].contains(activeElement)) {
+        activeNoteIndex = i;
+        break;
+      }
+    }
+    
+    // 如果没有找到活动便签，默认选择第一个或最后一个
+    if (activeNoteIndex === -1) {
+      activeNoteIndex = direction === 'next' ? -1 : noteElements.length;
+    }
+    
+    // 计算目标便签索引
+    let targetIndex;
+    if (direction === 'next') {
+      targetIndex = (activeNoteIndex + 1) % noteElements.length;
+    } else {
+      targetIndex = (activeNoteIndex - 1 + noteElements.length) % noteElements.length;
+    }
+    
+    // 聚焦到目标便签的标题输入框
+    const targetNote = noteElements[targetIndex];
+    const titleInput = targetNote.querySelector('.note-title-input');
+    if (titleInput) {
+      titleInput.focus();
+      console.log(`导航到${direction === 'next' ? '下' : '上'}一个便签`);
+    }
+  }
+  
+  /**
+   * 将焦点移动到当前便签的内容编辑区
+   */
+  focusNoteContent() {
+    // 获取当前活动元素
+    const activeElement = document.activeElement;
+    
+    // 查找当前活动元素所在的便签容器
+    let noteContainer = null;
+    if (activeElement) {
+      // 尝试多种可能的便签容器类名
+      noteContainer = activeElement.closest('.note-container') || 
+                      activeElement.closest('.note') || 
+                      activeElement.closest('.sticky-note');
+    }
+    
+    // 如果没有找到便签容器，尝试获取第一个便签
+    if (!noteContainer) {
+      // 尝试多种可能的便签容器选择器
+      const allNotes = document.querySelectorAll('.note-container, .note, .sticky-note');
+      
+      if (allNotes.length > 0) {
+        noteContainer = allNotes[0];
+      } else {
+        return; // 没有便签，无法聚焦
+      }
+    }
+    
+    // 尝试多种可能的内容编辑区选择器
+    const contentArea = noteContainer.querySelector('.note-content-input') || 
+                        noteContainer.querySelector('.note-content') || 
+                        noteContainer.querySelector('textarea') ||
+                        noteContainer.querySelector('[contenteditable="true"]');
+    
+    if (contentArea) {
+      contentArea.focus();
+    }
   }
 
   /**
