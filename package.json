@@ -48,5 +48,8 @@
     "linux": {
       "icon": "assets/icons/icon-512.png"
     }
+  },
+  "dependencies": {
+    "marked": "^16.3.0"
   }
 }

@@ -10,6 +10,8 @@ import SearchService from './services/search.js';
 import NotificationService from './services/notification.js';
 import ToolsService from './services/tools.js';
 
+// Markdown解析库通过CDN引入，不需要import
+
 // 导入工具模块
 import { formatTime } from './utils/time.js';
 import { getElement, debounce } from './utils/dom.js';
@@ -36,6 +38,20 @@ class StickyNotesApp {
     
     // 定时器
     this.timeUpdateInterval = null;
+    
+    // 记录最后获得焦点的便签ID
+    this.lastFocusedNoteId = null;
+    
+    // 添加全局事件监听器来记录最后焦点便签
+    document.addEventListener('mousedown', (event) => {
+      const noteContainer = event.target.closest('.note-container');
+      if (noteContainer) {
+        const noteId = noteContainer.getAttribute('data-note-id');
+        if (noteId) {
+          this.lastFocusedNoteId = noteId;
+        }
+      }
+    });
     
     // 绑定方法上下文
     this.handleSaveNote = this.handleSaveNote.bind(this);
@@ -92,11 +108,11 @@ class StickyNotesApp {
    */
   createToolButton(id, title, iconId, clickHandler) {
     const button = document.createElement('button');
-    button.className = `tool-btn ${id}-btn`;
+    button.className = `toolbar-btn ${id}-btn`;
     button.title = title;
     
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'tool-icon');
+    svg.setAttribute('class', 'btn-icon');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('fill', 'none');
     svg.setAttribute('stroke', 'currentColor');
@@ -105,14 +121,28 @@ class StickyNotesApp {
     // 从模板中获取SVG内容
     const iconTemplate = document.getElementById(iconId);
     if (iconTemplate) {
-      svg.innerHTML = iconTemplate.innerHTML;
+      // 复制SVG内容
+      const paths = iconTemplate.querySelectorAll("path, circle, rect, line, polyline");
+      paths.forEach(path => {
+        const newPath = path.cloneNode(true);
+        svg.appendChild(newPath);
+      });
+    } else {
+      console.warn(`找不到图标模板: ${iconId}`);
     }
     
     button.appendChild(svg);
     
     // 添加点击事件
     if (clickHandler) {
-      button.addEventListener('click', clickHandler);
+      button.addEventListener('click', () => {
+        const noteElement = button.closest('.note-container');
+        const contentTextarea = noteElement.querySelector('.note-content');
+        
+        if (contentTextarea) {
+          clickHandler(contentTextarea);
+        }
+      });
     }
     
     return button;
@@ -131,7 +161,9 @@ class StickyNotesApp {
     // 清空工具栏
     toolbar.innerHTML = '';
     
-    // 获取可用工具
+    // Markdown预览按钮现在通过工具服务添加
+    
+    // 获取其他可用工具
     const tools = this.toolsService.getAvailableTools(noteElement);
     
     // 动态创建工具按钮
@@ -328,6 +360,7 @@ class StickyNotesApp {
         console.log('还原便签');
         noteElement.classList.remove('maximized');
         document.body.classList.remove('has-maximized-note'); // 移除body类名
+        document.documentElement.classList.remove('has-maximized-note'); // 移除html类名
         noteElement.querySelector('.maximize-btn').title = '最大化编辑';
         noteElement.querySelector('.maximize-btn svg path').setAttribute('d', 'M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3');
       } else {
@@ -335,6 +368,7 @@ class StickyNotesApp {
         console.log('最大化便签');
         noteElement.classList.add('maximized');
         document.body.classList.add('has-maximized-note'); // 添加body类名
+        document.documentElement.classList.add('has-maximized-note'); // 添加html类名
         noteElement.querySelector('.maximize-btn').title = '还原便签';
         noteElement.querySelector('.maximize-btn svg path').setAttribute('d', 'M4 14h6m0 0v6m0-6l-7 7m11-3h6m0 0v-6m0 6l-7-7');
         
@@ -454,6 +488,54 @@ class StickyNotesApp {
           e.preventDefault();
           this.focusNoteContent();
         }
+        // Ctrl+M - 切换Markdown预览
+        else if (e.key === 'm' || e.key === 'M') {
+          e.preventDefault();
+          
+          let targetNoteContainer;
+          
+          // 优先使用最后获得焦点的便签
+          if (this.lastFocusedNoteId) {
+            targetNoteContainer = document.querySelector(`.note-container[data-note-id="${this.lastFocusedNoteId}"]`);
+          }
+          
+          // 如果没有最后焦点便签，则使用最大化的便签
+          if (!targetNoteContainer) {
+            targetNoteContainer = document.querySelector('.note-container.maximized');
+          }
+          
+          // 如果没有最大化的便签，则使用第一个可见的便签
+          if (!targetNoteContainer) {
+            const visibleNotes = Array.from(document.querySelectorAll('.note-container')).filter(
+              note => note.style.display !== 'none'
+            );
+            if (visibleNotes.length > 0) {
+              targetNoteContainer = visibleNotes[0];
+            }
+          }
+          
+          if (targetNoteContainer) {
+            const textarea = targetNoteContainer.querySelector('.note-content');
+            const markdownPreview = targetNoteContainer.querySelector('.markdown-preview');
+            
+            if (textarea && markdownPreview) {
+              // 检查当前是否处于预览模式
+              if (markdownPreview.style.display !== 'none' && textarea.style.display === 'none') {
+                // 从预览模式切换回编辑模式
+                textarea.style.display = 'block';
+                markdownPreview.style.display = 'none';
+                // 切换回编辑模式后，将焦点设置到文本区域
+                textarea.focus();
+              } else {
+                // 从编辑模式切换到预览模式
+                this.toolsService.toggleMarkdownPreview(textarea);
+              }
+            } else if (textarea) {
+              // 如果没有预览元素，则创建一个
+              this.toolsService.toggleMarkdownPreview(textarea);
+            }
+          }
+        }
         // Ctrl+M快捷键已移除，仅使用F11作为全屏快捷键
       }
       
@@ -461,7 +543,27 @@ class StickyNotesApp {
       if (e.key === 'F11') {
         e.preventDefault();
         const activeElement = document.activeElement;
-        const noteContainer = activeElement ? activeElement.closest('.note-container') : null;
+        let noteContainer = activeElement ? activeElement.closest('.note-container') : null;
+        
+        // 如果没有找到便签容器（可能是在预览模式下点击了预览区域）
+        if (!noteContainer) {
+          // 尝试查找当前可能处于预览模式的便签
+          const markdownPreview = document.querySelector('.markdown-preview[style*="display: block"]');
+          if (markdownPreview) {
+            noteContainer = markdownPreview.closest('.note-container');
+          }
+          
+          // 如果仍然没有找到，尝试使用最后一个获得焦点的便签
+          if (!noteContainer && this.lastFocusedNoteId) {
+            noteContainer = document.querySelector(`.note-container[data-note-id="${this.lastFocusedNoteId}"]`);
+          }
+          
+          // 如果仍然没有找到，尝试使用已经最大化的便签
+          if (!noteContainer) {
+            noteContainer = document.querySelector('.note-container.maximized');
+          }
+        }
+        
         if (noteContainer) {
           this.toggleMaximizeNote(noteContainer.dataset.noteId);
         }
@@ -508,7 +610,12 @@ class StickyNotesApp {
     const titleInput = targetNote.querySelector('.note-title-input');
     if (titleInput) {
       titleInput.focus();
-      console.log(`导航到${direction === 'next' ? '下' : '上'}一个便签`);
+      
+      // 更新最后焦点便签ID
+      const noteId = targetNote.getAttribute('data-note-id');
+      if (noteId) {
+        this.lastFocusedNoteId = noteId;
+      }
     }
   }
   
@@ -614,11 +721,15 @@ window.toggleMaximize = function(button) {
   if (noteContainer.classList.contains('maximized')) {
     // 还原便签
     noteContainer.classList.remove('maximized');
+    document.body.classList.remove('has-maximized-note'); // 移除body类名
+    document.documentElement.classList.remove('has-maximized-note'); // 移除html类名
     button.title = '最大化编辑';
     button.querySelector('svg path').setAttribute('d', 'M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3');
   } else {
     // 最大化便签
     noteContainer.classList.add('maximized');
+    document.body.classList.add('has-maximized-note'); // 添加body类名
+    document.documentElement.classList.add('has-maximized-note'); // 添加html类名
     button.title = '还原便签';
     button.querySelector('svg path').setAttribute('d', 'M4 14h6m0 0v6m0-6l-7 7m11-3h6m0 0v-6m0 6l-7-7');
     
@@ -633,18 +744,109 @@ window.toggleMaximize = function(button) {
 };
 
 /**
- * 绑定便签事件
- * @param {Element} noteElement - 便签DOM元素
- * @param {Object} note - 便签数据
+ * 初始化工具栏
  */
-StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
-  const titleInput = noteElement.querySelector('.note-title-input');
-  const contentTextarea = noteElement.querySelector('.note-content');
-  const saveButton = noteElement.querySelector('.save-btn');
-  const deleteButton = noteElement.querySelector('.delete-btn');
-  const toolsToggleBtn = noteElement.querySelector('.tools-toggle-btn');
-  const toolbarWrapper = noteElement.querySelector('.toolbar-wrapper');
-  const maximizeButton = noteElement.querySelector('.maximize-btn');
+StickyNotesApp.prototype.initToolbar = function() {
+    const tools = [
+      {
+        id: 'toggle-preview',
+        title: '切换Markdown预览',
+        iconId: 'toggle-preview-icon',
+        handler: (textarea) => this.toolsService.toggleMarkdownPreview(textarea)
+      },
+      {
+        id: 'format-json',
+        title: '格式化JSON',
+        iconId: 'format-json-icon',
+        handler: this.toolsService.formatJson
+      },
+      {
+        id: 'format-text',
+        title: '格式化文本',
+        iconId: 'format-text-icon',
+        handler: this.toolsService.formatText
+      },
+      {
+        id: 'copy',
+        title: '复制内容',
+        iconId: 'copy-icon',
+        handler: this.toolsService.copyText
+      },
+      {
+        id: 'clear',
+        title: '清空内容',
+        iconId: 'clear-icon',
+        handler: this.toolsService.clearText
+      }
+    ];
+    
+    return tools;
+  }
+  
+  /**
+   * 绑定便签事件
+   * @param {Element} noteElement - 便签DOM元素
+   * @param {Object} note - 便签数据
+   */
+  StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
+    const titleInput = noteElement.querySelector('.note-title-input');
+    const contentTextarea = noteElement.querySelector('.note-content');
+    const saveButton = noteElement.querySelector('.save-btn');
+    const deleteButton = noteElement.querySelector('.delete-btn');
+    const toolsToggleBtn = noteElement.querySelector('.tools-toggle-btn');
+    const toolbarWrapper = noteElement.querySelector('.toolbar-wrapper');
+    const maximizeButton = noteElement.querySelector('.maximize-btn');
+    const togglePreviewButton = noteElement.querySelector('.toggle-preview-btn');
+    const markdownPreview = noteElement.querySelector('.markdown-preview');
+    
+    // 记录便签获得焦点 - 使用mousedown事件代替click，更早捕获
+    noteElement.addEventListener('mousedown', () => {
+      console.log('便签获得焦点:', note.id);
+      this.lastFocusedNoteId = note.id;
+    });
+    
+    // 记录便签获得焦点 - 使用mouseenter事件，当鼠标进入便签时记录
+    noteElement.addEventListener('mouseenter', () => {
+      console.log('鼠标进入便签:', note.id);
+      this.lastFocusedNoteId = note.id;
+    });
+    
+    // 记录文本区域获得焦点
+    if (contentTextarea) {
+      contentTextarea.addEventListener('focus', () => {
+        console.log('文本区域获得焦点:', note.id);
+        this.lastFocusedNoteId = note.id;
+      });
+      
+      // 添加点击事件
+      contentTextarea.addEventListener('click', () => {
+        console.log('点击文本区域:', note.id);
+        this.lastFocusedNoteId = note.id;
+      });
+    }
+    
+    // 记录标题获得焦点
+    if (titleInput) {
+      titleInput.addEventListener('focus', () => {
+        console.log('标题获得焦点:', note.id);
+        this.lastFocusedNoteId = note.id;
+      });
+      
+      // 添加点击事件
+      titleInput.addEventListener('click', () => {
+        console.log('点击标题:', note.id);
+        this.lastFocusedNoteId = note.id;
+      });
+    }
+    
+    // 记录预览区域获得焦点
+    const previewElement = noteElement.querySelector('.markdown-preview');
+    if (previewElement) {
+      previewElement.addEventListener('click', () => {
+        console.log('点击预览区域:', note.id);
+        this.lastFocusedNoteId = note.id;
+      });
+    }
   
   // 最大化按钮点击事件
   if (maximizeButton) {
@@ -671,6 +873,11 @@ StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
       this.handleSaveNote(note.id, {
         content: contentTextarea.value
       });
+      
+      // 如果预览区域存在且可见，则更新预览内容
+      if (markdownPreview && markdownPreview.style.display !== 'none') {
+        this.updateMarkdownPreview(contentTextarea, markdownPreview);
+      }
     });
   }
   
@@ -693,10 +900,21 @@ StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
     });
   }
   
-  // 最大化按钮点击事件
-  if (maximizeButton) {
-    maximizeButton.addEventListener('click', () => {
-      this.toggleMaximizeNote(note.id);
+  // Markdown预览切换按钮点击事件
+  if (togglePreviewButton && markdownPreview) {
+    togglePreviewButton.addEventListener('click', () => {
+      if (contentTextarea.style.display === 'none') {
+        // 切换到编辑模式
+        contentTextarea.style.display = 'block';
+        markdownPreview.style.display = 'none';
+        togglePreviewButton.title = '预览Markdown';
+      } else {
+        // 切换到预览模式
+        contentTextarea.style.display = 'none';
+        markdownPreview.style.display = 'block';
+        this.updateMarkdownPreview(contentTextarea, markdownPreview);
+        togglePreviewButton.title = '编辑内容';
+      }
     });
   }
   
@@ -720,3 +938,5 @@ StickyNotesApp.prototype.bindNoteEvents = function(noteElement, note) {
     });
   });
 }
+
+// 已移动到tools.js中实现

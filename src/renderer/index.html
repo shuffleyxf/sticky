@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>sticky</title>
   <link rel="stylesheet" href="./styles/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
   <!-- SVG图标定义 -->
@@ -17,6 +18,10 @@
       <path d="M14 4v14" stroke-width="3"/>
       <path d="M14 18h-4" stroke-width="3"/>
       <path d="M10 18c0 0-2 0-2-4" stroke-width="3"/>
+    </svg>
+    <svg id="toggle-preview-icon-template" viewBox="0 0 24 24">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
     </svg>
   </div>
 
@@ -92,10 +97,19 @@
         </div>
         <div class="note-body">
           <div class="note-content-wrapper">
-            <textarea class="note-content" placeholder="在这里输入你的便签内容..."></textarea>
+            <div class="editor-container">
+              <textarea class="note-content" placeholder="在这里输入你的便签内容..."></textarea>
+              <div class="markdown-preview" style="display: none;"></div>
+            </div>
             <div class="toolbar-wrapper">
               <div class="header-toolbar" id="note-toolbar">
                 <!-- 工具栏按钮将通过JavaScript动态添加 -->
+                <button class="toolbar-btn toggle-preview-btn" title="切换Markdown预览">
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
