@@ -63,6 +63,9 @@ class StickyNotesApp {
       // 绑定事件监听器
       this.bindEventListeners();
       
+      // 绑定快捷键事件
+      this.bindShortcutEvents();
+      
       // 启动定时器
       this.startTimeUpdateTimer();
       
@@ -378,8 +381,23 @@ class StickyNotesApp {
       false
     );
     
-    // 重新渲染所有便签
+    // 重新渲染便签
     this.renderNotes();
+  }
+  
+  /**
+   * 绑定快捷键事件
+   */
+  bindShortcutEvents() {
+    // 监听来自主进程的搜索框聚焦事件
+    if (window.electronAPI && window.electronAPI.shortcuts) {
+      window.electronAPI.shortcuts.onFocusSearch(() => {
+        if (this.searchInput) {
+          this.searchInput.focus();
+          console.log('快捷键触发: 聚焦到搜索框');
+        }
+      });
+    }
   }
 
   /**

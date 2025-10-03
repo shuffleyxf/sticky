@@ -1,4 +1,4 @@
-const { app } = require('electron');
+const { app, globalShortcut } = require('electron');
 const WindowManager = require('./window');
 const IPCHandlers = require('./ipc/handlers');
 
@@ -32,6 +32,24 @@ if (!gotSingleInstanceLock) {
     
     // 注册IPC处理程序
     IPCHandlers.register();
+    
+    // 注册全局快捷键
+    globalShortcut.register('CommandOrControl+Shift+/', () => {
+      const mainWindow = windowManager.getMainWindow();
+      if (mainWindow) {
+        // 如果窗口最小化或隐藏，则显示窗口
+        if (mainWindow.isMinimized()) {
+          mainWindow.restore();
+        }
+        if (!mainWindow.isVisible()) {
+          mainWindow.show();
+        }
+        // 激活窗口（将焦点放到窗口上）
+        mainWindow.focus();
+        // 发送消息到渲染进程，聚焦搜索框
+        mainWindow.webContents.send('focus-search');
+      }
+    });
   });
 }
 

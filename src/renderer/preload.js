@@ -15,5 +15,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
     // 获取存储路径信息
     getPath: () => ipcRenderer.invoke('storage:getPath')
+  },
+  
+  // 快捷键相关API
+  shortcuts: {
+    // 监听搜索框聚焦事件
+    onFocusSearch: (callback) => {
+      ipcRenderer.on('focus-search', callback);
+      return () => ipcRenderer.removeListener('focus-search', callback);
+    }
   }
 });
