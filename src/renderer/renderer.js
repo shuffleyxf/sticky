@@ -369,11 +369,40 @@ class StickyNotesApp {
       if (noteElement.classList.contains('maximized')) {
         // 还原便签
         console.log('还原便签');
+        
+        // 先获取目标元素引用，避免后续查找
+        const titleInput = noteElement.querySelector('.note-title-input');
+        const contentEditor = noteElement.querySelector('.note-content');
+        const targetElement = contentEditor || titleInput; // 优先选择内容编辑区
+        
+        // 立即设置焦点到目标元素，防止焦点跳到其他地方
+        if (targetElement) {
+          targetElement.focus();
+        }
+        
+        // 移除沉浸式模式相关的CSS类
         noteElement.classList.remove('maximized');
-        document.body.classList.remove('has-maximized-note'); // 移除body类名
-        document.documentElement.classList.remove('has-maximized-note'); // 移除html类名
+        document.body.classList.remove('has-maximized-note');
+        document.documentElement.classList.remove('has-maximized-note');
         noteElement.querySelector('.maximize-btn').title = '最大化编辑';
         noteElement.querySelector('.maximize-btn svg path').setAttribute('d', 'M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3');
+        
+        // 使用较短的延时，在布局稳定后进行滚动和焦点设置
+        setTimeout(() => {
+          // 滚动到便签位置
+          noteElement.scrollIntoView({
+            behavior: 'instant', // 使用instant避免滚动动画造成的闪烁
+            block: 'center'
+          });
+          
+          // 再次确保焦点在正确位置，优先聚焦内容编辑区
+           if (contentEditor) {
+             contentEditor.focus();
+           } else if (titleInput) {
+             titleInput.focus();
+             titleInput.select();
+           }
+        }, 50); // 减少延时时间
       } else {
         // 最大化便签
         console.log('最大化便签');
