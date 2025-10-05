@@ -287,6 +287,17 @@ class StickyNotesApp {
         if (inputs && inputs.titleInput) {
           inputs.titleInput.focus();
           inputs.titleInput.select();
+          
+          // 检查是否有已经最大化的便签，如果有，则将新便签也设为最大化
+          const hasMaximizedNote = document.body.classList.contains('has-maximized-note');
+          if (hasMaximizedNote) {
+            // 获取新便签的容器元素
+            const noteElement = document.querySelector(`.note-container[data-note-id="${newNote.id}"]`);
+            if (noteElement) {
+              // 将新便签设为最大化状态
+              this.toggleMaximizeNote(newNote.id);
+            }
+          }
         }
       }, 100);
     } catch (error) {
@@ -482,6 +493,11 @@ class StickyNotesApp {
         else if (e.key === 'ArrowDown') {
           e.preventDefault();
           this.navigateNotes('next');
+        }
+        // Ctrl+N - 创建新便签
+        else if (e.key === 'n' || e.key === 'N') {
+          e.preventDefault();
+          this.handleCreateNote();
         }
         // Ctrl+E - 将焦点移动到便签内容编辑区
         else if (e.key === 'e' || e.key === 'E') {
