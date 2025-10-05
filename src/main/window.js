@@ -1,9 +1,11 @@
-const { BrowserWindow, nativeImage } = require('electron');
+const { BrowserWindow, nativeImage, Tray, Menu } = require('electron');
 const path = require('path');
 
 class WindowManager {
   constructor() {
     this.mainWindow = null;
+    this.tray = null;
+    this.isQuitting = false;
   }
 
   createWindow() {
@@ -33,6 +35,17 @@ class WindowManager {
     // 打开开发者工具 (已禁用)
     // this.mainWindow.webContents.openDevTools();
 
+    // 创建托盘
+    this.createTray(appIcon);
+
+    // 修改窗口关闭行为：点击X按钮时最小化到托盘而不是退出
+    this.mainWindow.on('close', (event) => {
+      if (!this.isQuitting) {
+        event.preventDefault();
+        this.mainWindow.hide();
+      }
+    });
+
     // 当window被关闭时，触发下面的事件
     this.mainWindow.on('closed', () => {
       this.mainWindow = null;
@@ -41,8 +54,97 @@ class WindowManager {
     return this.mainWindow;
   }
 
+  createTray(appIcon) {
+    // 创建托盘图标
+    this.tray = new Tray(appIcon);
+    
+    // 设置托盘提示文本
+    this.tray.setToolTip('便签应用');
+    
+    // 创建托盘右键菜单
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: '显示窗口',
+        click: () => {
+          this.showWindow();
+        }
+      },
+      {
+        label: '隐藏窗口',
+        click: () => {
+          if (this.mainWindow) {
+            this.mainWindow.hide();
+          }
+        }
+      },
+      {
+        type: 'separator'
+      },
+      {
+        label: '退出应用',
+        click: () => {
+          this.quitApp();
+        }
+      }
+    ]);
+    
+    // 设置托盘右键菜单
+    this.tray.setContextMenu(contextMenu);
+    
+    // 托盘图标双击事件：显示/隐藏窗口
+    this.tray.on('double-click', () => {
+      this.toggleWindow();
+    });
+    
+    // 托盘图标单击事件（Windows）
+    if (process.platform === 'win32') {
+      this.tray.on('click', () => {
+        this.toggleWindow();
+      });
+    }
+  }
+
+  showWindow() {
+    if (this.mainWindow) {
+      if (this.mainWindow.isMinimized()) {
+        this.mainWindow.restore();
+      }
+      this.mainWindow.show();
+      this.mainWindow.focus();
+    }
+  }
+
+  toggleWindow() {
+    if (this.mainWindow) {
+      if (this.mainWindow.isVisible()) {
+        this.mainWindow.hide();
+      } else {
+        this.showWindow();
+      }
+    }
+  }
+
+  quitApp() {
+    this.isQuitting = true;
+    if (this.tray) {
+      this.tray.destroy();
+      this.tray = null;
+    }
+    if (this.mainWindow) {
+      this.mainWindow.close();
+      this.mainWindow = null;
+    }
+    // 确保应用进程完全退出
+    const { app } = require('electron');
+    app.quit();
+  }
+
   getMainWindow() {
     return this.mainWindow;
+  }
+
+  getTray() {
+    return this.tray;
   }
 
   hasWindows() {

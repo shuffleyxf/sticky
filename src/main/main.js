@@ -53,11 +53,14 @@ if (!gotSingleInstanceLock) {
   });
 }
 
-// 所有窗口关闭时退出应用
+// 所有窗口关闭时的处理
 app.on('window-all-closed', function () {
-  // 在macOS上，除非用户使用Cmd + Q确定地退出
-  // 否则绝大部分应用会保持活动状态
-  if (process.platform !== 'darwin') app.quit();
+  // 由于我们使用托盘，不要在所有窗口关闭时退出应用
+  // 应用将继续在托盘中运行
+  // 只有在macOS上且没有托盘时才退出
+  if (process.platform === 'darwin' && (!windowManager || !windowManager.tray)) {
+    app.quit();
+  }
 });
 
 app.on('activate', function () {
@@ -69,4 +72,21 @@ app.on('activate', function () {
     }
     windowManager.createWindow();
   }
+});
+
+// 应用退出前的清理
+app.on('before-quit', () => {
+  if (windowManager) {
+    // 只清理资源，不再次调用app.quit()
+    windowManager.isQuitting = true;
+    if (windowManager.getTray()) {
+      windowManager.getTray().destroy();
+    }
+  }
+});
+
+// 处理Cmd+Q (macOS) 或 Ctrl+Q 退出
+app.on('will-quit', (event) => {
+  // 注销所有全局快捷键
+  globalShortcut.unregisterAll();
 });
