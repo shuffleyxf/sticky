@@ -608,7 +608,17 @@ class StickyNotesApp {
       }
     }
     
-    // 如果没有找到活动便签，默认选择第一个或最后一个
+    // 如果没有找到活动便签，尝试使用最后一个获得焦点的便签
+    if (activeNoteIndex === -1 && this.lastFocusedNoteId) {
+      for (let i = 0; i < noteElements.length; i++) {
+        if (noteElements[i].dataset.noteId === this.lastFocusedNoteId) {
+          activeNoteIndex = i;
+          break;
+        }
+      }
+    }
+    
+    // 如果仍然没有找到活动便签，默认选择第一个或最后一个
     if (activeNoteIndex === -1) {
       activeNoteIndex = direction === 'next' ? -1 : noteElements.length;
     }
@@ -621,16 +631,37 @@ class StickyNotesApp {
       targetIndex = (activeNoteIndex - 1 + noteElements.length) % noteElements.length;
     }
     
-    // 聚焦到目标便签的标题输入框
+    // 获取目标便签
     const targetNote = noteElements[targetIndex];
-    const titleInput = targetNote.querySelector('.note-title-input');
-    if (titleInput) {
-      titleInput.focus();
+    const noteId = targetNote.getAttribute('data-note-id');
+    if (!noteId) return;
+    
+    // 更新最后焦点便签ID
+    this.lastFocusedNoteId = noteId;
+    
+    // 检查是否处于沉浸式模式
+    const isMaximized = document.body.classList.contains('has-maximized-note');
+    
+    if (isMaximized) {
+      // 在沉浸式模式下，先将当前便签恢复正常大小，然后将目标便签设为沉浸式模式
+      const currentMaximizedNote = document.querySelector('.note-container.maximized');
+      if (currentMaximizedNote) {
+        currentMaximizedNote.classList.remove('maximized');
+      }
       
-      // 更新最后焦点便签ID
-      const noteId = targetNote.getAttribute('data-note-id');
-      if (noteId) {
-        this.lastFocusedNoteId = noteId;
+      // 将目标便签设为沉浸式模式
+      targetNote.classList.add('maximized');
+      
+      // 聚焦到目标便签的内容区域
+      const contentTextarea = targetNote.querySelector('.note-content');
+      if (contentTextarea) {
+        contentTextarea.focus();
+      }
+    } else {
+      // 非沉浸式模式下，聚焦到目标便签的标题输入框
+      const titleInput = targetNote.querySelector('.note-title-input');
+      if (titleInput) {
+        titleInput.focus();
       }
     }
   }
